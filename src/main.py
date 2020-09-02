@@ -11,6 +11,8 @@ import pandas as pd
 from inverted_file import InvertedFile, InvertedIndex, TermDocInfo, DocWordCountInfo  
 from term_container import TermContainer
 from query import Query, QueryExpandImpl 
+from review import ReviewContainer
+from tfidf import TFIDF
 
 # read autohome scrap
 def read_scrap(filename):
@@ -38,13 +40,18 @@ def get_query_list(workbook_path):
         if query:
             query = query.replace(" ", "")
             query_list.append(Query(query))
-            print(query)
     return query_list
 
 def apply_query_expand_to_query_list(query_list, query_expand_impl):
     for query in query_list:
         query.query_expand(query_expand_impl)
-        query.print_query_expansion()
+        query.preprocess()
+
+def apply_query_search_to_query_list(query_list, inverted_file, tfidf_engine, review_container):
+    for query in query_list:
+        print("Query: ", query.get_query())
+        print("----------------")
+        query.search(inverted_file, tfidf_engine, review_container)
 
 if __name__ == "__main__":
     # argument list
@@ -54,22 +61,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # read scrap_workbook
-    #scrap_workbook = read_scrap(args.scrap_file_name)
+    scrap_workbook = read_scrap(args.scrap_file_name)
     #
     ## ES6
-    #ES6_sheet = scrap_workbook["蔚来ES6"]
-    #review_list = get_review_list(ES6_sheet)
-    #doc_word_count_info_list = build_doc_word_count_info_list(review_list)
-    #
+    ES6_sheet = scrap_workbook["蔚来ES6"]
+    review_container = ReviewContainer(ES6_sheet)
+    review_list = review_container.get_review_list()
+    doc_word_count_info_list = build_doc_word_count_info_list(review_list)
+    
     ## build model data structure
-    #term_container = TermContainer(doc_word_count_info_list)
-    #inverted_file = InvertedFile(term_container, doc_word_count_info_list)
+    term_container = TermContainer(doc_word_count_info_list)
+    inverted_file = InvertedFile(term_container, doc_word_count_info_list)
     
     # build query
     query_list = get_query_list(args.query_expand_workbook_path)
     query_expand_impl = QueryExpandImpl(args.query_expand_workbook_path)
     apply_query_expand_to_query_list(query_list,  query_expand_impl)
-    
-    
-    
+
+    # search 
+    tfidf_engine = TFIDF(review_container)    
+    apply_query_search_to_query_list(query_list, inverted_file, tfidf_engine, review_container)  
     
