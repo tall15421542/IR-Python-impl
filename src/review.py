@@ -8,7 +8,8 @@ class ReviewContainer:
     def build(self, sheet):
         for col in sheet.iter_rows(min_row = 2, min_col = 8, max_col = 8, values_only = True):
             review = col[0]
-            self.review_list.append(review)
+            if review:
+                self.review_list.append(review.upper())
         self.set_N()
         self.set_avdl()
 
@@ -33,6 +34,9 @@ class ReviewContainer:
     def get_review_list(self):
         return self.review_list
 
+    def get_review(self, review_id):
+        return self.review_list[review_id]
+
 class ReviewAccumulatorDict:
     def __init__(self, inverted_file, tfidf_engine, review_container):
         self.inverted_file = inverted_file
@@ -44,7 +48,6 @@ class ReviewAccumulatorDict:
         if self.inverted_file.is_exist(term):
             term_id = self.inverted_file.get_term_id(term)
             inverted_index = self.inverted_file.get_inverted_index(term_id)
-            print(term, inverted_index.get_df())
             self.update_doc_id_to_review_accumulator_dict(qtf, inverted_index)
 
     def update_doc_id_to_review_accumulator_dict(self, qtf, inverted_index):
@@ -53,7 +56,6 @@ class ReviewAccumulatorDict:
             doc_id = doc_info.doc_id
             dl = self.review_container.get_dl_given_doc_id(doc_id)
             tf = doc_info.tf
-            print(doc_id, tf)
             review_accumulator = self.doc_id_to_review_accumulator_dict.get(doc_id, ReviewAccumulator(doc_id))
             review_accumulator.update_score(self.tfidf_engine.get_tfidf_score(df, qtf, tf, dl))
             self.doc_id_to_review_accumulator_dict[doc_id] = review_accumulator

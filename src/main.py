@@ -51,13 +51,23 @@ def apply_query_search_to_query_list(query_list, inverted_file, tfidf_engine, re
     for query in query_list:
         print("Query: ", query.get_query())
         print("----------------")
-        query.search(inverted_file, tfidf_engine, review_container)
+        query.search_and_update_topk_review(inverted_file, tfidf_engine, review_container)
+
+def set_topk_for_query_list(query_list, topk):
+    for query in query_list:
+        query.set_topk(topk)
+
+def update_workbook_for_query_list(query_list, review_container, workbook):
+    for query in query_list:
+        query.update_workbook_sheet(review_container, workbook)
 
 if __name__ == "__main__":
     # argument list
     parser = argparse.ArgumentParser(description = "Scrap_search_engine")
     parser.add_argument('-i', action = 'store', dest = 'scrap_file_name', required = True)
     parser.add_argument('-f', action = 'store', dest = 'query_expand_workbook_path')
+    parser.add_argument('-k', action = 'store', dest = 'topk', type = int, required = True)
+    parser.add_argument('-o', action = 'store', dest = 'output_path', default = "../output/search_result.xlsx")
     args = parser.parse_args()
     
     # read scrap_workbook
@@ -76,9 +86,15 @@ if __name__ == "__main__":
     # build query
     query_list = get_query_list(args.query_expand_workbook_path)
     query_expand_impl = QueryExpandImpl(args.query_expand_workbook_path)
+    set_topk_for_query_list(query_list, args.topk)
     apply_query_expand_to_query_list(query_list,  query_expand_impl)
 
     # search 
     tfidf_engine = TFIDF(review_container)    
     apply_query_search_to_query_list(query_list, inverted_file, tfidf_engine, review_container)  
-    
+   
+    # output_workbook
+    workbook = Workbook()
+    update_workbook_for_query_list(query_list, review_container, workbook)
+    workbook.remove(workbook['Sheet'])
+    workbook.save(args.output_path)

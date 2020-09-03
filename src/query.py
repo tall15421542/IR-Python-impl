@@ -11,6 +11,8 @@ class Query:
         self.query_expansion_list = []
         self.term_freq_dict = {}
         self.top_k = 2
+        self.topk_review_queue = []
+        heapq.heapify(self.topk_review_queue)
 
     def query_expand(self, query_expand_impl):
         self.query_expansion_list = query_expand_impl.expand_for_search(self.query)
@@ -31,27 +33,33 @@ class Query:
         for term, tf in self.term_freq_dict.items():
             print(term, tf)
 
-    def search(self, inverted_file, tfidf_engine, review_container):
-        topk_review_queue = []
-        heapq.heapify(topk_review_queue)
+    def search_and_update_topk_review(self, inverted_file, tfidf_engine, review_container):
         review_accumulator_dict = ReviewAccumulatorDict(inverted_file, tfidf_engine, review_container)
         for term in self.query_expansion_list:
             qtf = self.term_freq_dict[term]
             review_accumulator_dict.update(qtf, term)
-        self.update_topk_review_queue(topk_review_queue, review_accumulator_dict)
+        self.update_topk_review_queue(review_accumulator_dict)
 
-    def update_topk_review_queue(self, topk_review_queue, review_accumulator_dict):
+    def update_topk_review_queue(self, review_accumulator_dict):
+        print(self.top_k)
         for review_accumulator in review_accumulator_dict.values():
-            if len(topk_review_queue) < self.top_k:
-                heapq.heappush(topk_review_queue, review_accumulator)
-            elif topk_review_queue[0] < review_accumulator:
-                heapq.heappop(topk_review_queue)
-                heapq.heappush(topk_review_queue, review_accumulator)
-        topk_review_queue.reverse()
-        for review_accumulator in topk_review_queue:
-            print(review_accumulator.doc_id, review_accumulator.score)
+            if len(self.topk_review_queue) < self.top_k:
+                heapq.heappush(self.topk_review_queue, review_accumulator)
+            elif self.topk_review_queue[0] < review_accumulator:
+                heapq.heappop(self.topk_review_queue)
+                heapq.heappush(self.topk_review_queue, review_accumulator)
+        self.topk_review_queue = heapq.nlargest(self.top_k, self.topk_review_queue)
+
+    def update_workbook_sheet(self, review_container, workbook):
+        sheet = workbook.create_sheet(self.query)
+        sheet.append(["review", "score"])
+        for review_accumulator in self.topk_review_queue:
+            review = review_container.get_review(review_accumulator.doc_id)
+            score = review_accumulator.get_score()
+            sheet.append([review, score])
     
-       
+    def set_topk(self, topk):
+        self.top_k = topk
 
 class QueryExpandImpl:
     def __init__(self, query_expand_workbook_path):
@@ -75,7 +83,7 @@ class QueryExpandImpl:
                 continue
             if cell:
                 cell = cell.replace(" ", "")
-                cell_list.append(cell)
+                cell_list.append(cell.upper())
         return cell_list
 
     def expand_for_search(self, query):
